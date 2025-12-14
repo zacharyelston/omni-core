@@ -1,5 +1,6 @@
 //! API routes
 
+mod admin;
 mod auth;
 mod health;
 mod keys;
@@ -12,6 +13,11 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         // Health
         .route("/health", get(health::health_check))
+        // Server info (public)
+        .route("/server/info", get(admin::get_server_info))
+        // Admin
+        .route("/admin/login", post(admin::admin_login))
+        .route("/admin/dashboard", get(admin::admin_dashboard))
         // Auth
         .route("/auth/join", post(auth::join))
         .route("/auth/verify", post(auth::verify))

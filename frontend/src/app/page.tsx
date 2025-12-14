@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface Session {
   session_id: string;
@@ -21,10 +22,16 @@ interface ServerKey {
   registeredAt?: string;
 }
 
-type Tab = 'register' | 'client-keys' | 'server-keys';
+interface ServerInfo {
+  server_public_key: string;
+  server_name: string;
+  version: string;
+}
+
+type Tab = 'home' | 'register' | 'client-keys' | 'server-keys';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<Tab>('register');
+  const [activeTab, setActiveTab] = useState<Tab>('home');
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,15 +39,32 @@ export default function Home() {
   const [clientKeys, setClientKeys] = useState<ClientKey[]>([]);
   const [serverKeys, setServerKeys] = useState<ServerKey[]>([]);
   const [pendingServerKey, setPendingServerKey] = useState<string | null>(null);
+  const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
+  const [adminKey, setAdminKey] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showMyQR, setShowMyQR] = useState(false);
 
-  // Load saved keys on mount
+  // Load saved keys and server info on mount
   useEffect(() => {
     const saved = localStorage.getItem('omni_client_keys');
     if (saved) {
       setClientKeys(JSON.parse(saved));
     }
     fetchServerKeys();
+    fetchServerInfo();
   }, []);
+
+  const fetchServerInfo = async () => {
+    try {
+      const res = await fetch('/api/v1/server/info');
+      if (res.ok) {
+        const data = await res.json();
+        setServerInfo(data);
+      }
+    } catch {
+      // Ignore errors
+    }
+  };
 
   // Save client keys when they change
   useEffect(() => {
@@ -159,40 +183,142 @@ export default function Home() {
 
   const handleLogout = () => {
     setSession(null);
+    setIsAdmin(false);
     localStorage.removeItem('omni_api_key');
+  };
+
+  const handleAdminLogin = async () => {
+    if (!adminKey.trim()) {
+      setError('Please enter admin key');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/v1/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_key: adminKey }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error('Invalid admin key');
+      setIsAdmin(true);
+      setAdminKey('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
   };
 
   const TabButton = ({ tab, label }: { tab: Tab; label: string }) => (
     <button
       onClick={() => setActiveTab(tab)}
-      className={`flex-1 py-3 text-sm font-medium transition-colors ${
+      className={`flex-1 py-2 text-xs font-medium transition-colors ${
         activeTab === tab
           ? 'bg-blue-600 text-white'
           : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-      } ${tab === 'register' ? 'rounded-l-lg' : ''} ${tab === 'server-keys' ? 'rounded-r-lg' : ''}`}
+      } ${tab === 'home' ? 'rounded-l-lg' : ''} ${tab === 'server-keys' ? 'rounded-r-lg' : ''}`}
     >
       {label}
     </button>
   );
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-4 pt-8">
+    <main className="flex min-h-screen flex-col items-center p-4 pt-6">
       <div className="w-full max-w-md space-y-4">
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold mb-1">Omni Core</h1>
-          <p className="text-slate-400 text-sm">Encrypted Key Exchange</p>
+        <div className="text-center mb-4">
+          <h1 className="text-2xl font-bold mb-1">Omni Core</h1>
+          <p className="text-slate-400 text-xs">Encrypted Key Exchange</p>
         </div>
 
         {/* Tab Navigation */}
         <div className="flex">
+          <TabButton tab="home" label="Home" />
           <TabButton tab="register" label="Register" />
           <TabButton tab="client-keys" label="My Keys" />
-          <TabButton tab="server-keys" label="Server Keys" />
+          <TabButton tab="server-keys" label="Server" />
         </div>
 
         {error && (
           <div className="bg-red-500/20 border border-red-500 rounded-lg p-3 text-red-300 text-sm">
             {error}
+          </div>
+        )}
+
+        {/* Home Tab - Server Public Key QR + Admin Login */}
+        {activeTab === 'home' && (
+          <div className="bg-slate-800 rounded-lg p-5 space-y-4">
+            {/* Server Public Key with QR */}
+            <div className="text-center space-y-3">
+              <h2 className="text-lg font-semibold">Server Public Key</h2>
+              {serverInfo ? (
+                <>
+                  <div className="bg-white p-4 rounded-lg inline-block">
+                    <QRCodeSVG 
+                      value={serverInfo.server_public_key} 
+                      size={160}
+                      level="M"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs text-slate-400">Scan or copy to connect</p>
+                    <div 
+                      className="bg-slate-900 rounded p-2 font-mono text-xs break-all cursor-pointer hover:bg-slate-700"
+                      onClick={() => copyToClipboard(serverInfo.server_public_key)}
+                      title="Click to copy"
+                    >
+                      {serverInfo.server_public_key}
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      {serverInfo.server_name} v{serverInfo.version}
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <p className="text-slate-400 text-sm">Loading server info...</p>
+              )}
+            </div>
+
+            <hr className="border-slate-700" />
+
+            {/* Admin Login */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-slate-300">Admin Login</h3>
+              {isAdmin ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full" />
+                  <span className="text-green-400 text-sm">Logged in as Admin</span>
+                  <button
+                    onClick={handleLogout}
+                    className="ml-auto text-xs text-red-400 hover:text-red-300"
+                  >
+                    Logout
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={adminKey}
+                    onChange={(e) => setAdminKey(e.target.value)}
+                    placeholder="Enter admin key"
+                    className="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  />
+                  <button
+                    onClick={handleAdminLogin}
+                    disabled={loading || !adminKey.trim()}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded px-4 py-2 text-sm font-medium"
+                  >
+                    Login
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -265,7 +391,17 @@ export default function Home() {
         {/* Client Keys Tab */}
         {activeTab === 'client-keys' && (
           <div className="bg-slate-800 rounded-lg p-5 space-y-4">
-            <h2 className="text-lg font-semibold">My Keypairs</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold">My Keypairs</h2>
+              {clientKeys.length > 0 && (
+                <button
+                  onClick={() => setShowMyQR(!showMyQR)}
+                  className="text-xs text-blue-400 hover:text-blue-300"
+                >
+                  {showMyQR ? 'Hide QR' : 'Show QR'}
+                </button>
+              )}
+            </div>
             {clientKeys.length === 0 ? (
               <p className="text-slate-400 text-sm">No keys generated yet. Register to create a keypair.</p>
             ) : (
@@ -278,10 +414,28 @@ export default function Home() {
                         {new Date(key.createdAt).toLocaleDateString()}
                       </span>
                     </div>
+                    
+                    {/* QR Code for sharing */}
+                    {showMyQR && (
+                      <div className="flex justify-center py-2">
+                        <div className="bg-white p-3 rounded-lg">
+                          <QRCodeSVG 
+                            value={key.publicKey} 
+                            size={120}
+                            level="M"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="space-y-1">
                       <label className="text-xs text-slate-400">Public Key</label>
-                      <div className="font-mono text-xs text-green-400 break-all">
-                        {key.publicKey.slice(0, 32)}...
+                      <div 
+                        className="font-mono text-xs text-green-400 break-all cursor-pointer hover:bg-slate-800 rounded p-1"
+                        onClick={() => copyToClipboard(key.publicKey)}
+                        title="Click to copy"
+                      >
+                        {showMyQR ? key.publicKey : `${key.publicKey.slice(0, 32)}...`}
                       </div>
                     </div>
                     <div className="space-y-1">
