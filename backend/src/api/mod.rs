@@ -3,6 +3,7 @@
 mod auth;
 mod health;
 mod keys;
+mod register;
 
 use axum::{routing::{get, post}, Router};
 use crate::services::AppState;
@@ -15,8 +16,13 @@ pub fn routes() -> Router<AppState> {
         .route("/auth/join", post(auth::join))
         .route("/auth/verify", post(auth::verify))
         .route("/auth/logout", post(auth::logout))
-        // Key exchange
+        // Key exchange (legacy)
         .route("/keys/public", get(keys::get_public_key))
         .route("/keys/exchange", post(keys::key_exchange))
         .route("/keys/send", post(keys::send_encrypted))
+        // Registration (per-client keypairs)
+        .route("/register/init", post(register::register_init))
+        .route("/register/complete", post(register::register_complete))
+        .route("/register/clients", get(register::list_clients))
+        .route("/register/keys", get(register::list_server_keys))
 }

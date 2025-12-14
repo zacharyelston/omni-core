@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface Session {
   session_id: string;
@@ -8,53 +8,96 @@ interface Session {
   expires_at: string;
 }
 
+interface ClientKey {
+  id: string;
+  publicKey: string;
+  privateKey: string;
+  createdAt: string;
+}
+
+interface ServerKey {
+  clientId: string;
+  publicKey: string;
+  registeredAt?: string;
+}
+
+type Tab = 'register' | 'client-keys' | 'server-keys';
+
 export default function Home() {
+  const [activeTab, setActiveTab] = useState<Tab>('register');
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [clientId, setClientId] = useState('');
+  const [clientKeys, setClientKeys] = useState<ClientKey[]>([]);
+  const [serverKeys, setServerKeys] = useState<ServerKey[]>([]);
+  const [pendingServerKey, setPendingServerKey] = useState<string | null>(null);
 
-  const handleJoin = async () => {
-    setLoading(true);
-    setError(null);
+  // Load saved keys on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('omni_client_keys');
+    if (saved) {
+      setClientKeys(JSON.parse(saved));
+    }
+    fetchServerKeys();
+  }, []);
+
+  // Save client keys when they change
+  useEffect(() => {
+    localStorage.setItem('omni_client_keys', JSON.stringify(clientKeys));
+  }, [clientKeys]);
+
+  const fetchServerKeys = async () => {
     try {
-      const res = await fetch('/api/v1/auth/join', { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to join');
-      const data = await res.json();
-      setSession(data);
-      localStorage.setItem('omni_api_key', data.api_key);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unknown error');
-    } finally {
-      setLoading(false);
+      const res = await fetch('/api/v1/register/keys');
+      if (res.ok) {
+        const data = await res.json();
+        setServerKeys(data.keys.map((k: { client_id: string; public_key: string }) => ({
+          clientId: k.client_id,
+          publicKey: k.public_key,
+        })));
+      }
+    } catch {
+      // Ignore errors on initial load
     }
   };
 
-  const handleVerify = async () => {
-    const apiKey = session?.api_key || localStorage.getItem('omni_api_key');
-    if (!apiKey) {
-      setError('No API key found');
+  // Generate a simple keypair (in production, use Web Crypto API)
+  const generateKeyPair = (): { publicKey: string; privateKey: string } => {
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    const privateKey = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    // In a real implementation, derive public key from private key using X25519
+    // For demo, we'll use a placeholder
+    const publicBytes = new Uint8Array(32);
+    crypto.getRandomValues(publicBytes);
+    const publicKey = Array.from(publicBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    return { publicKey, privateKey };
+  };
+
+  const handleRegisterInit = async () => {
+    if (!clientId.trim()) {
+      setError('Please enter a client ID');
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/v1/auth/verify', {
+      const res = await fetch('/api/v1/register/init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_key: apiKey }),
+        body: JSON.stringify({ client_id: clientId }),
       });
       const data = await res.json();
-      if (data.valid) {
-        setSession({
-          session_id: data.session_id,
-          api_key: apiKey,
-          expires_at: data.expires_at,
-        });
-      } else {
-        setSession(null);
-        localStorage.removeItem('omni_api_key');
-        setError('Session expired or invalid');
-      }
+      if (!res.ok) throw new Error(data.message || 'Registration failed');
+      
+      setPendingServerKey(data.server_public_key);
+      
+      // Add to server keys list
+      setServerKeys(prev => [...prev, {
+        clientId: data.client_id,
+        publicKey: data.server_public_key,
+      }]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
@@ -62,18 +105,51 @@ export default function Home() {
     }
   };
 
-  const handleLogout = async () => {
-    const apiKey = session?.api_key || localStorage.getItem('omni_api_key');
-    if (!apiKey) return;
+  const handleRegisterComplete = async () => {
+    if (!pendingServerKey) {
+      setError('No pending registration');
+      return;
+    }
     setLoading(true);
+    setError(null);
     try {
-      await fetch('/api/v1/auth/logout', {
+      // Generate client keypair
+      const keyPair = generateKeyPair();
+      
+      // Save client key
+      const newClientKey: ClientKey = {
+        id: clientId,
+        publicKey: keyPair.publicKey,
+        privateKey: keyPair.privateKey,
+        createdAt: new Date().toISOString(),
+      };
+      setClientKeys(prev => [...prev, newClientKey]);
+
+      // Send public key to server (base64 encoded for transport)
+      const encodedPublicKey = btoa(keyPair.publicKey);
+      
+      const res = await fetch('/api/v1/register/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_key: apiKey }),
+        body: JSON.stringify({
+          client_id: clientId,
+          encrypted_client_public_key: {
+            nonce: '',
+            ciphertext: encodedPublicKey,
+          },
+        }),
       });
-      setSession(null);
-      localStorage.removeItem('omni_api_key');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Registration failed');
+      
+      setSession({
+        session_id: clientId,
+        api_key: data.api_key,
+        expires_at: new Date(Date.now() + 3600000).toISOString(),
+      });
+      localStorage.setItem('omni_api_key', data.api_key);
+      setPendingServerKey(null);
+      setClientId('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
@@ -81,94 +157,186 @@ export default function Home() {
     }
   };
 
+  const handleLogout = () => {
+    setSession(null);
+    localStorage.removeItem('omni_api_key');
+  };
+
+  const TabButton = ({ tab, label }: { tab: Tab; label: string }) => (
+    <button
+      onClick={() => setActiveTab(tab)}
+      className={`flex-1 py-3 text-sm font-medium transition-colors ${
+        activeTab === tab
+          ? 'bg-blue-600 text-white'
+          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+      } ${tab === 'register' ? 'rounded-l-lg' : ''} ${tab === 'server-keys' ? 'rounded-r-lg' : ''}`}
+    >
+      {label}
+    </button>
+  );
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-6">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-2">Omni Core</h1>
-          <p className="text-slate-400">Authentication & Session Management</p>
+    <main className="flex min-h-screen flex-col items-center p-4 pt-8">
+      <div className="w-full max-w-md space-y-4">
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-bold mb-1">Omni Core</h1>
+          <p className="text-slate-400 text-sm">Encrypted Key Exchange</p>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex">
+          <TabButton tab="register" label="Register" />
+          <TabButton tab="client-keys" label="My Keys" />
+          <TabButton tab="server-keys" label="Server Keys" />
         </div>
 
         {error && (
-          <div className="bg-red-500/20 border border-red-500 rounded-lg p-4 text-red-300">
+          <div className="bg-red-500/20 border border-red-500 rounded-lg p-3 text-red-300 text-sm">
             {error}
           </div>
         )}
 
-        {session ? (
-          <div className="bg-slate-800 rounded-lg p-6 space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-green-400 font-medium">Connected</span>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm text-slate-400">Session ID</label>
-              <div className="bg-slate-900 rounded p-3 font-mono text-sm break-all">
-                {session.session_id}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm text-slate-400">API Key</label>
-              <div className="bg-slate-900 rounded p-3 font-mono text-xs break-all">
-                {session.api_key}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm text-slate-400">Expires</label>
-              <div className="bg-slate-900 rounded p-3 text-sm">
-                {new Date(session.expires_at).toLocaleString()}
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <button
-                onClick={handleVerify}
-                disabled={loading}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg py-3 font-medium transition-colors"
-              >
-                Verify
-              </button>
-              <button
-                onClick={handleLogout}
-                disabled={loading}
-                className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg py-3 font-medium transition-colors"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-slate-800 rounded-lg p-6 space-y-4">
-            <p className="text-slate-300 text-center">
-              Join to create a new session and receive an API key.
-            </p>
-            <button
-              onClick={handleJoin}
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg py-4 font-medium text-lg transition-colors"
-            >
-              {loading ? 'Connecting...' : 'Join'}
-            </button>
-            
-            {localStorage.getItem('omni_api_key') && (
-              <button
-                onClick={handleVerify}
-                disabled={loading}
-                className="w-full bg-slate-700 hover:bg-slate-600 disabled:opacity-50 rounded-lg py-3 font-medium transition-colors"
-              >
-                Restore Session
-              </button>
+        {/* Register Tab */}
+        {activeTab === 'register' && (
+          <div className="bg-slate-800 rounded-lg p-5 space-y-4">
+            {session ? (
+              <>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="text-green-400 text-sm font-medium">Registered as {session.session_id}</span>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400">API Key</label>
+                  <div className="bg-slate-900 rounded p-2 font-mono text-xs break-all">
+                    {session.api_key}
+                  </div>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="w-full bg-red-600 hover:bg-red-700 rounded-lg py-2 text-sm font-medium"
+                >
+                  Logout
+                </button>
+              </>
+            ) : pendingServerKey ? (
+              <>
+                <p className="text-slate-300 text-sm">
+                  Server generated a keypair for <strong>{clientId}</strong>. 
+                  Click below to generate your keypair and complete registration.
+                </p>
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400">Server Public Key</label>
+                  <div className="bg-slate-900 rounded p-2 font-mono text-xs break-all">
+                    {pendingServerKey.slice(0, 32)}...
+                  </div>
+                </div>
+                <button
+                  onClick={handleRegisterComplete}
+                  disabled={loading}
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded-lg py-3 font-medium"
+                >
+                  {loading ? 'Generating...' : 'Generate Keys & Complete'}
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-slate-300 text-sm">
+                  Enter a unique client ID to register with the server.
+                </p>
+                <input
+                  type="text"
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                  placeholder="my-device-001"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+                <button
+                  onClick={handleRegisterInit}
+                  disabled={loading || !clientId.trim()}
+                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg py-3 font-medium"
+                >
+                  {loading ? 'Registering...' : 'Start Registration'}
+                </button>
+              </>
             )}
           </div>
         )}
 
-        <div className="text-center text-sm text-slate-500">
-          <a href="/api/v1/health" className="hover:text-slate-300">
-            API Health Check
-          </a>
+        {/* Client Keys Tab */}
+        {activeTab === 'client-keys' && (
+          <div className="bg-slate-800 rounded-lg p-5 space-y-4">
+            <h2 className="text-lg font-semibold">My Keypairs</h2>
+            {clientKeys.length === 0 ? (
+              <p className="text-slate-400 text-sm">No keys generated yet. Register to create a keypair.</p>
+            ) : (
+              <div className="space-y-3">
+                {clientKeys.map((key) => (
+                  <div key={key.id} className="bg-slate-900 rounded-lg p-3 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium text-sm">{key.id}</span>
+                      <span className="text-xs text-slate-500">
+                        {new Date(key.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-slate-400">Public Key</label>
+                      <div className="font-mono text-xs text-green-400 break-all">
+                        {key.publicKey.slice(0, 32)}...
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-slate-400">Private Key (hidden)</label>
+                      <div className="font-mono text-xs text-red-400">
+                        ••••••••••••••••
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Server Keys Tab */}
+        {activeTab === 'server-keys' && (
+          <div className="bg-slate-800 rounded-lg p-5 space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold">Known Server Keys</h2>
+              <button
+                onClick={fetchServerKeys}
+                className="text-xs text-blue-400 hover:text-blue-300"
+              >
+                Refresh
+              </button>
+            </div>
+            {serverKeys.length === 0 ? (
+              <p className="text-slate-400 text-sm">No server keys known yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {serverKeys.map((key) => (
+                  <div key={key.clientId} className="bg-slate-900 rounded-lg p-3 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium text-sm">{key.clientId}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-slate-400">Server Public Key</label>
+                      <div className="font-mono text-xs text-blue-400 break-all">
+                        {key.publicKey.slice(0, 32)}...
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="text-center text-xs text-slate-500 pt-4">
+          <a href="/api/v1/health" className="hover:text-slate-300">Health</a>
+          {' • '}
+          <a href="/api/v1/register/clients" className="hover:text-slate-300">Clients</a>
+          {' • '}
+          <a href="/api/v1/register/keys" className="hover:text-slate-300">Keys</a>
         </div>
       </div>
     </main>
