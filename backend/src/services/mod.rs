@@ -4,6 +4,7 @@ mod admin;
 mod client_store;
 mod crypto;
 mod keystore;
+mod server_config;
 mod server_registry;
 mod session;
 mod sync;
@@ -22,6 +23,9 @@ pub use admin::AdminAuth;
 pub use client_store::{ClientConfig, ClientStore};
 pub use crypto::{parse_public_key, CryptoError, EncryptedMessage, ServerKeyPair};
 pub use keystore::{ClientEntry, KeyStoreManager, ServerKeyEntry};
+pub use server_config::{
+    AuthSettings, ConfigManager, FederationSettings, NetworkSettings, ServerConfig, ServerSettings,
+};
 pub use server_registry::{ServerEntry, ServerRegistry};
 pub use session::{Session, SessionStore};
 pub use sync::spawn_sync_service;
@@ -35,6 +39,7 @@ pub struct AppState {
     pub client_store: ClientStore,
     pub server_registry: ServerRegistry,
     pub admin: AdminAuth,
+    pub server_config: ConfigManager,
 }
 
 impl AppState {
@@ -50,6 +55,7 @@ impl AppState {
             client_store: ClientStore::new(),
             server_registry: ServerRegistry::new(),
             admin,
+            server_config: ConfigManager::new(),
         }
     }
 }

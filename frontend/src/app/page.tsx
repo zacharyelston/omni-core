@@ -36,7 +36,31 @@ interface KnownServer {
   is_authenticated: boolean;
 }
 
-type Tab = 'home' | 'register' | 'client-keys' | 'server-keys';
+type Tab = 'home' | 'register' | 'client-keys' | 'server-keys' | 'settings';
+
+interface ServerConfig {
+  server: {
+    id: string;
+    name: string;
+    description: string;
+    version: string;
+  };
+  network: {
+    host: string;
+    port: number;
+    public_url: string;
+  };
+  auth: {
+    session_ttl_secs: number;
+    admin_session_multiplier: number;
+  };
+  federation: {
+    enabled: boolean;
+    public: boolean;
+    sync_interval_secs: number;
+    max_known_servers: number;
+  };
+}
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>('home');
@@ -52,6 +76,8 @@ export default function Home() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showMyQR, setShowMyQR] = useState(false);
   const [knownServers, setKnownServers] = useState<KnownServer[]>([]);
+  const [serverConfig, setServerConfig] = useState<ServerConfig | null>(null);
+  const [settingsSaved, setSettingsSaved] = useState(false);
 
   // Load saved keys and server info on mount
   useEffect(() => {
@@ -62,7 +88,40 @@ export default function Home() {
     fetchServerKeys();
     fetchServerInfo();
     fetchKnownServers();
+    fetchSettings();
   }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/v1/settings');
+      if (res.ok) {
+        const data = await res.json();
+        setServerConfig(data);
+      }
+    } catch {
+      // Ignore errors
+    }
+  };
+
+  const saveSettings = async () => {
+    if (!serverConfig) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/v1/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(serverConfig),
+      });
+      if (!res.ok) throw new Error('Failed to save settings');
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 3000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchKnownServers = async () => {
     try {
@@ -244,7 +303,7 @@ export default function Home() {
         activeTab === tab
           ? 'bg-blue-600 text-white'
           : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-      } ${tab === 'home' ? 'rounded-l-lg' : ''} ${tab === 'server-keys' ? 'rounded-r-lg' : ''}`}
+      } ${tab === 'home' ? 'rounded-l-lg' : ''} ${tab === 'settings' ? 'rounded-r-lg' : ''}`}
     >
       {label}
     </button>
@@ -262,8 +321,9 @@ export default function Home() {
         <div className="flex">
           <TabButton tab="home" label="Home" />
           <TabButton tab="register" label="Register" />
-          <TabButton tab="client-keys" label="My Keys" />
+          <TabButton tab="client-keys" label="Keys" />
           <TabButton tab="server-keys" label="Server" />
+          <TabButton tab="settings" label="Settings" />
         </div>
 
         {error && (
@@ -537,6 +597,209 @@ export default function Home() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <div className="bg-slate-800 rounded-lg p-5 space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold">Server Settings</h2>
+              {settingsSaved && (
+                <span className="text-green-400 text-xs">✓ Saved</span>
+              )}
+            </div>
+
+            {!isAdmin ? (
+              <div className="text-center py-4">
+                <p className="text-slate-400 text-sm mb-2">Admin login required to edit settings</p>
+                <button
+                  onClick={() => setActiveTab('home')}
+                  className="text-blue-400 text-sm hover:text-blue-300"
+                >
+                  Go to Home to login
+                </button>
+              </div>
+            ) : serverConfig ? (
+              <div className="space-y-4">
+                {/* Server Identity */}
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-slate-300 border-b border-slate-700 pb-1">Server Identity</h3>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-slate-400">Server Name</label>
+                      <input
+                        type="text"
+                        value={serverConfig.server.name}
+                        onChange={(e) => setServerConfig({
+                          ...serverConfig,
+                          server: { ...serverConfig.server, name: e.target.value }
+                        })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400">Description</label>
+                      <input
+                        type="text"
+                        value={serverConfig.server.description}
+                        onChange={(e) => setServerConfig({
+                          ...serverConfig,
+                          server: { ...serverConfig.server, description: e.target.value }
+                        })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Network */}
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-slate-300 border-b border-slate-700 pb-1">Network</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-slate-400">Host</label>
+                      <input
+                        type="text"
+                        value={serverConfig.network.host}
+                        onChange={(e) => setServerConfig({
+                          ...serverConfig,
+                          network: { ...serverConfig.network, host: e.target.value }
+                        })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400">Port</label>
+                      <input
+                        type="number"
+                        value={serverConfig.network.port}
+                        onChange={(e) => setServerConfig({
+                          ...serverConfig,
+                          network: { ...serverConfig.network, port: parseInt(e.target.value) || 8080 }
+                        })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400">Public URL</label>
+                    <input
+                      type="text"
+                      value={serverConfig.network.public_url}
+                      onChange={(e) => setServerConfig({
+                        ...serverConfig,
+                        network: { ...serverConfig.network, public_url: e.target.value }
+                      })}
+                      placeholder="https://my-server.example.com"
+                      className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white placeholder-slate-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Auth */}
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-slate-300 border-b border-slate-700 pb-1">Authentication</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-slate-400">Session TTL (seconds)</label>
+                      <input
+                        type="number"
+                        value={serverConfig.auth.session_ttl_secs}
+                        onChange={(e) => setServerConfig({
+                          ...serverConfig,
+                          auth: { ...serverConfig.auth, session_ttl_secs: parseInt(e.target.value) || 3600 }
+                        })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400">Admin Multiplier</label>
+                      <input
+                        type="number"
+                        value={serverConfig.auth.admin_session_multiplier}
+                        onChange={(e) => setServerConfig({
+                          ...serverConfig,
+                          auth: { ...serverConfig.auth, admin_session_multiplier: parseInt(e.target.value) || 24 }
+                        })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Federation */}
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-slate-300 border-b border-slate-700 pb-1">Federation</h3>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={serverConfig.federation.enabled}
+                        onChange={(e) => setServerConfig({
+                          ...serverConfig,
+                          federation: { ...serverConfig.federation, enabled: e.target.checked }
+                        })}
+                        className="rounded bg-slate-900 border-slate-700"
+                      />
+                      <span className="text-slate-300">Enabled</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={serverConfig.federation.public}
+                        onChange={(e) => setServerConfig({
+                          ...serverConfig,
+                          federation: { ...serverConfig.federation, public: e.target.checked }
+                        })}
+                        className="rounded bg-slate-900 border-slate-700"
+                      />
+                      <span className="text-slate-300">Public</span>
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-slate-400">Sync Interval (sec)</label>
+                      <input
+                        type="number"
+                        value={serverConfig.federation.sync_interval_secs}
+                        onChange={(e) => setServerConfig({
+                          ...serverConfig,
+                          federation: { ...serverConfig.federation, sync_interval_secs: parseInt(e.target.value) || 3600 }
+                        })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400">Max Servers</label>
+                      <input
+                        type="number"
+                        value={serverConfig.federation.max_known_servers}
+                        onChange={(e) => setServerConfig({
+                          ...serverConfig,
+                          federation: { ...serverConfig.federation, max_known_servers: parseInt(e.target.value) || 1000 }
+                        })}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <button
+                  onClick={saveSettings}
+                  disabled={loading}
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded-lg py-3 font-medium"
+                >
+                  {loading ? 'Saving...' : 'Save Settings'}
+                </button>
+                <p className="text-xs text-slate-500 text-center">
+                  Note: Network changes require server restart
+                </p>
+              </div>
+            ) : (
+              <p className="text-slate-400 text-sm">Loading settings...</p>
+            )}
           </div>
         )}
 
