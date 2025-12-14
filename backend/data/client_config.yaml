@@ -3,5 +3,5 @@ clients:
     client_id: test-device
     client_public_key: abc123def456abc123def456abc123def456abc123def456abc123def456abcd
     server_key_id: test-device
-    registered_at: 2025-12-14T23:14:18.996594+00:00
-    last_seen: 2025-12-14T23:14:18.996595+00:00
+    registered_at: 2025-12-14T23:29:44.579033+00:00
+    last_seen: 2025-12-14T23:29:44.579033+00:00

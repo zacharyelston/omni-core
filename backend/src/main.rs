@@ -31,6 +31,17 @@ async fn main() -> anyhow::Result<()> {
     // Create app state
     let state = services::AppState::new(config);
 
+    // Start background sync service (hourly by default)
+    let sync_interval = std::env::var("SYNC_INTERVAL_SECS")
+        .ok()
+        .and_then(|s| s.parse().ok());
+    services::spawn_sync_service(
+        state.server_registry.clone(),
+        state.admin.get_server_id(),
+        state.admin.get_server_public_key(),
+        sync_interval,
+    );
+
     // Build router
     let app = Router::new()
         .nest("/api/v1", api::routes())
