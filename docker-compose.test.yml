@@ -1,0 +1,114 @@
+version: '3.8'
+
+# Test configuration with multiple servers for federation testing
+services:
+  # Primary server
+  server1:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "9081:8080"
+    volumes:
+      - server1-data:/app/data
+    environment:
+      - RUST_LOG=debug
+      - HOST=0.0.0.0
+      - PORT=8080
+      - SERVER_NAME=Server-Alpha
+    networks:
+      - omni-test-network
+
+  # Secondary server for federation testing
+  server2:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "9082:8080"
+    volumes:
+      - server2-data:/app/data
+    environment:
+      - RUST_LOG=debug
+      - HOST=0.0.0.0
+      - PORT=8080
+      - SERVER_NAME=Server-Beta
+    networks:
+      - omni-test-network
+
+  # Third server for mesh testing
+  server3:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "9083:8080"
+    volumes:
+      - server3-data:/app/data
+    environment:
+      - RUST_LOG=debug
+      - HOST=0.0.0.0
+      - PORT=8080
+      - SERVER_NAME=Server-Gamma
+    networks:
+      - omni-test-network
+
+  # Frontend pointing to server1
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://server1:8080
+    depends_on:
+      - server1
+    networks:
+      - omni-test-network
+
+  # Test runner
+  test-runner:
+    image: curlimages/curl:latest
+    depends_on:
+      - server1
+      - server2
+      - server3
+    networks:
+      - omni-test-network
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for servers to start..."
+        sleep 10
+        
+        echo "=== Testing Server 1 ==="
+        curl -s http://server1:8080/api/v1/health | head -c 200
+        echo ""
+        
+        echo "=== Testing Server 2 ==="
+        curl -s http://server2:8080/api/v1/health | head -c 200
+        echo ""
+        
+        echo "=== Testing Server 3 ==="
+        curl -s http://server3:8080/api/v1/health | head -c 200
+        echo ""
+        
+        echo "=== Getting Server 1 Info ==="
+        curl -s http://server1:8080/api/v1/server/info | head -c 300
+        echo ""
+        
+        echo "=== Registering Server 2 with Server 1 ==="
+        SERVER2_INFO=$$(curl -s http://server2:8080/api/v1/server/info)
+        echo "Server 2 info: $$SERVER2_INFO"
+        
+        echo "=== All tests complete ==="
+
+volumes:
+  server1-data:
+  server2-data:
+  server3-data:
+
+networks:
+  omni-test-network:
+    driver: bridge

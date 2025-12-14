@@ -56,6 +56,25 @@ check:
 	@cd backend && cargo check
 	@cd frontend && npx tsc --noEmit 2>/dev/null || echo "⚠️  Run 'make install' first"
 
+# Docker
+docker-build:
+	@echo "🐳 Building Docker images..."
+	@docker-compose build
+
+docker-up:
+	@echo "🚀 Starting services..."
+	@docker-compose up -d
+
+docker-down:
+	@echo "🛑 Stopping services..."
+	@docker-compose down
+
+docker-logs:
+	@docker-compose logs -f
+
+docker-test:
+	@./scripts/docker-test.sh
+
 # Help
 help:
 	@echo "Omni Core Makefile"
@@ -74,4 +93,8 @@ help:
 	@echo "  fmt          - Format all code"
 	@echo "  check        - Quick syntax check (no tests)"
 	@echo "  clean        - Remove build artifacts"
+	@echo "  docker-build - Build Docker images"
+	@echo "  docker-up    - Start Docker services"
+	@echo "  docker-down  - Stop Docker services"
+	@echo "  docker-test  - Run Docker test suite"
 	@echo "  help         - Show this help"
