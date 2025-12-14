@@ -1,0 +1,32 @@
+modules = ["rust-stable"]
+
+[nix]
+channel = "stable-24_05"
+
+[env]
+RUST_LOG = "info"
+PORT = "8080"
+
+[workflows]
+runButton = "Backend"
+
+[[workflows.workflow]]
+name = "Backend"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cargo run --release --bin omni-server"
+waitForPort = 8080
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 8080
+externalPort = 80
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["bash", "-c", "cargo run --release --bin omni-server"]
+build = ["cargo", "build", "--release"]
