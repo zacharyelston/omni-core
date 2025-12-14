@@ -1,11 +1,11 @@
 keys:
   device-2:
     client_id: device-2
-    public_key: e10a2aaace07da732659ffe0c8ccf27c09ddc568e02b4ee452cefa274d91c464
-    secret_key: 5b979e279584e052955b6f46b744a96a90a166da0117e00095f3c06accb36e17
-    created_at: 2025-12-14T23:14:11.549011+00:00
+    public_key: 7080917e2f4c6921fc0babbd54116a154316c8e0999294ac713bab0f22477d7e
+    secret_key: 8dfb195cc09802abddf4b9a79fb019664da229742505981259844bcfacb20bc0
+    created_at: 2025-12-14T23:14:18.996601+00:00
   device-1:
     client_id: device-1
-    public_key: ff240be50b7c7db72a39af75c49aea96da7f031c69ab45b866478d9f1133f263
-    secret_key: 41aeafb2edf32c94a8505e2252a3cf3ed1eb00d9a3384f86eea0ad10841c40c8
-    created_at: 2025-12-14T23:14:11.548772+00:00
+    public_key: 07d6d423cd116c0535b20a1248bd2a6b05d45608aa2917c3b5a2732455aee412
+    secret_key: 4443eb97b8e10ea9ec2fc55715fabe41a4e60410400a1245bb30c87d456b96ee
+    created_at: 2025-12-14T23:14:18.996345+00:00
