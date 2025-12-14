@@ -5,9 +5,13 @@ mod auth;
 mod health;
 mod keys;
 mod register;
+mod servers;
 
-use axum::{routing::{get, post}, Router};
 use crate::services::AppState;
+use axum::{
+    routing::{get, post},
+    Router,
+};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -31,4 +35,10 @@ pub fn routes() -> Router<AppState> {
         .route("/register/complete", post(register::register_complete))
         .route("/register/clients", get(register::list_clients))
         .route("/register/keys", get(register::list_server_keys))
+        // Server federation
+        .route("/servers/public", get(servers::list_public_servers))
+        .route("/servers/register", post(servers::register_server))
+        .route("/servers/sync", post(servers::sync_servers))
+        .route("/servers/stats", get(servers::server_stats))
+        .route("/servers/all", get(servers::list_all_servers))
 }

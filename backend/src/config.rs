@@ -33,8 +33,7 @@ impl Config {
                 .ok()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or_else(default_port),
-            secret_key: std::env::var("SECRET_KEY")
-                .unwrap_or_else(|_| default_secret_key()),
+            secret_key: std::env::var("SECRET_KEY").unwrap_or_else(|_| default_secret_key()),
             session_ttl_secs: std::env::var("SESSION_TTL")
                 .ok()
                 .and_then(|t| t.parse().ok())

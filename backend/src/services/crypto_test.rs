@@ -8,7 +8,7 @@ mod tests {
     fn test_server_keypair_generation() {
         let keypair = ServerKeyPair::generate();
         let public_hex = keypair.public_key_hex();
-        
+
         // Public key should be 64 hex chars (32 bytes)
         assert_eq!(public_hex.len(), 64);
         assert!(hex::decode(&public_hex).is_ok());

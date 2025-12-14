@@ -28,6 +28,14 @@ interface ServerInfo {
   version: string;
 }
 
+interface KnownServer {
+  server_id: string;
+  name: string;
+  public_url: string;
+  public_key: string;
+  is_authenticated: boolean;
+}
+
 type Tab = 'home' | 'register' | 'client-keys' | 'server-keys';
 
 export default function Home() {
@@ -43,6 +51,7 @@ export default function Home() {
   const [adminKey, setAdminKey] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [showMyQR, setShowMyQR] = useState(false);
+  const [knownServers, setKnownServers] = useState<KnownServer[]>([]);
 
   // Load saved keys and server info on mount
   useEffect(() => {
@@ -52,7 +61,20 @@ export default function Home() {
     }
     fetchServerKeys();
     fetchServerInfo();
+    fetchKnownServers();
   }, []);
+
+  const fetchKnownServers = async () => {
+    try {
+      const res = await fetch('/api/v1/servers/all');
+      if (res.ok) {
+        const data = await res.json();
+        setKnownServers(data);
+      }
+    } catch {
+      // Ignore errors
+    }
+  };
 
   const fetchServerInfo = async () => {
     try {
@@ -451,46 +473,79 @@ export default function Home() {
           </div>
         )}
 
-        {/* Server Keys Tab */}
+        {/* Server Tab - Known Servers + Server Keys */}
         {activeTab === 'server-keys' && (
           <div className="bg-slate-800 rounded-lg p-5 space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold">Known Server Keys</h2>
-              <button
-                onClick={fetchServerKeys}
-                className="text-xs text-blue-400 hover:text-blue-300"
-              >
-                Refresh
-              </button>
-            </div>
-            {serverKeys.length === 0 ? (
-              <p className="text-slate-400 text-sm">No server keys known yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {serverKeys.map((key) => (
-                  <div key={key.clientId} className="bg-slate-900 rounded-lg p-3 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium text-sm">{key.clientId}</span>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs text-slate-400">Server Public Key</label>
-                      <div className="font-mono text-xs text-blue-400 break-all">
-                        {key.publicKey.slice(0, 32)}...
+            {/* Known Omni Servers */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold">Known Servers</h2>
+                <button
+                  onClick={fetchKnownServers}
+                  className="text-xs text-blue-400 hover:text-blue-300"
+                >
+                  Refresh
+                </button>
+              </div>
+              {knownServers.length === 0 ? (
+                <p className="text-slate-400 text-sm">No other servers discovered yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {knownServers.map((server) => (
+                    <div key={server.server_id} className="bg-slate-900 rounded-lg p-3 space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium text-sm">{server.name}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded ${server.is_authenticated ? 'bg-green-600' : 'bg-slate-600'}`}>
+                          {server.is_authenticated ? 'Connected' : 'Known'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400">{server.public_url}</p>
+                      <div className="font-mono text-xs text-blue-400 truncate">
+                        {server.public_key.slice(0, 24)}...
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <hr className="border-slate-700" />
+
+            {/* Per-Client Server Keys */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-medium text-slate-300">Client Server Keys</h3>
+                <button
+                  onClick={fetchServerKeys}
+                  className="text-xs text-blue-400 hover:text-blue-300"
+                >
+                  Refresh
+                </button>
               </div>
-            )}
+              {serverKeys.length === 0 ? (
+                <p className="text-slate-400 text-sm">No client keys yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {serverKeys.map((key) => (
+                    <div key={key.clientId} className="bg-slate-900 rounded p-2 space-y-1">
+                      <span className="font-medium text-xs">{key.clientId}</span>
+                      <div className="font-mono text-xs text-slate-500 truncate">
+                        {key.publicKey.slice(0, 24)}...
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         <div className="text-center text-xs text-slate-500 pt-4">
           <a href="/api/v1/health" className="hover:text-slate-300">Health</a>
           {' • '}
-          <a href="/api/v1/register/clients" className="hover:text-slate-300">Clients</a>
+          <a href="/api/v1/servers/public" className="hover:text-slate-300">Servers</a>
           {' • '}
-          <a href="/api/v1/register/keys" className="hover:text-slate-300">Keys</a>
+          <a href="/api/v1/servers/stats" className="hover:text-slate-300">Stats</a>
         </div>
       </div>
     </main>

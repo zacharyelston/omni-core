@@ -27,7 +27,7 @@ impl ServerKeyEntry {
     pub fn generate(client_id: &str) -> Self {
         let secret = StaticSecret::random_from_rng(rand::thread_rng());
         let public = PublicKey::from(&secret);
-        
+
         Self {
             client_id: client_id.to_string(),
             public_key: hex::encode(public.to_bytes()),
@@ -94,9 +94,8 @@ impl ServerKeysStore {
         if let Some(parent) = Path::new(path).parent() {
             fs::create_dir_all(parent)?;
         }
-        let yaml = serde_yaml::to_string(self).map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::Other, e)
-        })?;
+        let yaml = serde_yaml::to_string(self)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         fs::write(path, yaml)
     }
 
@@ -137,9 +136,8 @@ impl ClientConfigStore {
         if let Some(parent) = Path::new(path).parent() {
             fs::create_dir_all(parent)?;
         }
-        let yaml = serde_yaml::to_string(self).map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::Other, e)
-        })?;
+        let yaml = serde_yaml::to_string(self)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         fs::write(path, yaml)
     }
 
@@ -188,7 +186,7 @@ impl KeyStoreManager {
     pub fn register_client(&self, client_id: &str, client_public_key: &str) -> Option<ClientEntry> {
         // Ensure server key exists for this client
         let server_key = self.get_server_key(client_id)?;
-        
+
         let entry = ClientEntry {
             client_id: client_id.to_string(),
             client_public_key: client_public_key.to_string(),
@@ -228,7 +226,9 @@ impl KeyStoreManager {
     /// List all server keys
     pub fn list_server_keys(&self) -> Vec<(String, String)> {
         let store = self.server_keys.read().unwrap();
-        store.keys.iter()
+        store
+            .keys
+            .iter()
             .map(|(id, k)| (id.clone(), k.public_key.clone()))
             .collect()
     }
