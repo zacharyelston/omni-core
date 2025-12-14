@@ -1,579 +1,294 @@
-# Omni Core Project Review & Recommendations
+# Omni Core Project Review
+
+**Review Date:** December 14, 2025  
+**Version:** 0.1.x (Pre-release)  
+**Status:** Active Development
+
+---
 
 ## Executive Summary
 
-Omni Core is a well-structured authentication and session management system. This review identifies areas for improvement in modularity, code organization, and automation to make the project more maintainable and extensible.
+Omni Core is a federated encrypted key exchange server with a React frontend. The project has undergone significant refactoring to improve modularity and maintainability. All code now adheres to the established architecture standards (500-line file limit, separation of concerns).
+
+### Key Metrics
+
+| Metric | Value | Status |
+|--------|-------|--------|
+| Backend Files | 22 Rust files | ✅ |
+| Frontend Files | 19 TypeScript files | ✅ |
+| Largest Backend File | 313 lines (`server_registry.rs`) | ✅ Under 500 |
+| Largest Frontend File | 279 lines (`SettingsTab.tsx`) | ✅ Under 500 |
+| Test Coverage | 30 tests passing | ✅ |
+| Build Status | Compiles successfully | ✅ |
 
 ---
 
-## Current Architecture Assessment
+## Project Structure
 
-### Strengths ✅
-
-1. **Clean Separation of Concerns**
-   - `api/` - HTTP handlers
-   - `services/` - Business logic
-   - `config.rs` - Configuration
-   - Clear module boundaries
-
-2. **Good Testing Foundation**
-   - 30 unit tests passing
-   - Test files co-located with source (`*_test.rs`)
-   - Pre-commit hooks for quality gates
-
-3. **Modern Stack**
-   - Rust + Axum (performant, type-safe)
-   - Next.js + React (modern frontend)
-   - Docker support for deployment
-
-4. **Documentation**
-   - 9 docs covering architecture, API, deployment
-   - Integration guide for new projects
-
-### Areas for Improvement 🔧
-
----
-
-## 1. Backend Modularity
-
-### Current Issues
-
-**Problem: Monolithic `page.tsx` (817 lines)**
 ```
-frontend/src/app/page.tsx - Single file with all UI logic
-```
-
-**Problem: Overlapping Services**
-- `keystore.rs` and `client_store.rs` have similar functionality
-- `server_config.rs` duplicates some `config.rs` patterns
-
-**Problem: AppState Growing**
-```rust
-pub struct AppState {
-    pub config: Arc<Config>,
-    pub sessions: SessionStore,
-    pub server_keypair: Arc<ServerKeyPair>,
-    pub keystore: KeyStoreManager,
-    pub client_store: ClientStore,      // Similar to keystore
-    pub server_registry: ServerRegistry,
-    pub admin: AdminAuth,
-    pub server_config: ConfigManager,   // Similar to config
-}
-```
-
-### Recommendations
-
-#### 1.1 Extract Crates for Reusability
-
-```toml
-# Cargo.toml - Proposed workspace structure
-[workspace]
-members = [
-    "crates/omni-core",      # Core types and traits
-    "crates/omni-crypto",    # Crypto primitives
-    "crates/omni-storage",   # Storage abstractions
-    "crates/omni-server",    # HTTP server
-    "crates/omni-client",    # Client SDK
-]
-```
-
-**Benefits:**
-- Other projects can depend on `omni-core` or `omni-crypto` without the full server
-- Clearer dependency boundaries
-- Faster incremental builds
-
-#### 1.2 Introduce Traits for Storage
-
-```rust
-// crates/omni-storage/src/lib.rs
-pub trait EntityStore<T> {
-    fn get(&self, id: &str) -> Option<T>;
-    fn save(&self, entity: &T) -> Result<(), StorageError>;
-    fn delete(&self, id: &str) -> Result<(), StorageError>;
-    fn list(&self) -> Vec<T>;
-}
-
-// Implementations
-pub struct YamlStore<T> { ... }
-pub struct SqliteStore<T> { ... }  // Future
-pub struct PostgresStore<T> { ... } // Future
-```
-
-#### 1.3 Consolidate Config Management
-
-```rust
-// Merge config.rs and server_config.rs
-pub struct Config {
-    // Runtime config (env vars)
-    pub host: String,
-    pub port: u16,
-    
-    // Persistent config (YAML)
-    #[serde(flatten)]
-    pub server: ServerConfig,
-}
+omni-core/
+├── backend/                    # Rust Axum server
+│   └── src/
+│       ├── api/               # 8 route modules (20-193 lines each)
+│       ├── services/          # 10 service modules (61-313 lines each)
+│       ├── config.rs          # 43 lines
+│       └── main.rs            # 65 lines
+├── frontend/                   # Next.js React app
+│   └── src/
+│       ├── app/               # 2 files (page.tsx: 135 lines)
+│       ├── components/        # 7 component files
+│       ├── hooks/             # 6 custom hooks
+│       ├── lib/               # API client (94 lines)
+│       └── types/             # Shared types (87 lines)
+├── docs/                       # 12 documentation files
+├── scripts/                    # 5 utility scripts
+└── .github/workflows/          # 4 CI/CD workflows
 ```
 
 ---
 
-## 2. Frontend Modularity
+## Backend Analysis
 
-### Current Issues
+### Architecture (Rust + Axum)
 
-**Problem: Single 817-line component**
-- All state in one component
-- Hard to test individual features
-- No code splitting
+**Strengths:**
+- Clean separation between API routes and services
+- All files under 320 lines (well within 500-line limit)
+- Proper use of `Arc` and `RwLock` for thread-safe state
+- Modular service architecture with clear responsibilities
 
-### Recommendations
+**Services Overview:**
 
-#### 2.1 Component Extraction
+| Service | Lines | Responsibility |
+|---------|-------|----------------|
+| `server_registry.rs` | 313 | Federation server management |
+| `client_store.rs` | 289 | Client configuration storage |
+| `keystore.rs` | 239 | Key management and storage |
+| `server_config.rs` | 212 | Runtime configuration |
+| `sync.rs` | 192 | Background federation sync |
+| `crypto.rs` | 171 | X25519/ChaCha20 encryption |
+| `admin.rs` | 118 | Admin authentication |
+| `session.rs` | 98 | Session management |
+| `mod.rs` | 61 | AppState and exports |
+
+**API Endpoints (24 total):**
+
+| Category | Endpoints | Description |
+|----------|-----------|-------------|
+| Health | 1 | `/health` |
+| Server Info | 1 | `/server/info` |
+| Admin | 2 | Login, dashboard |
+| Auth | 3 | Join, verify, logout |
+| Keys | 3 | Public key, exchange, send |
+| Registration | 4 | Init, complete, list clients/keys |
+| Federation | 5 | Public servers, register, sync, stats, all |
+| Settings | 6 | GET/PUT for all config sections |
+
+### Test Coverage
 
 ```
-frontend/src/
-├── app/
-│   └── page.tsx              # Just layout + routing
-├── components/
-│   ├── tabs/
-│   │   ├── HomeTab.tsx
-│   │   ├── RegisterTab.tsx
-│   │   ├── KeysTab.tsx
-│   │   ├── ServerTab.tsx
-│   │   └── SettingsTab.tsx
-│   ├── common/
-│   │   ├── QRDisplay.tsx
-│   │   ├── KeyDisplay.tsx
-│   │   └── StatusBadge.tsx
-│   └── forms/
-│       ├── AdminLoginForm.tsx
-│       └── SettingsForm.tsx
-├── hooks/
-│   ├── useServerInfo.ts
-│   ├── useSettings.ts
-│   ├── useAuth.ts
-│   └── useKnownServers.ts
-├── lib/
-│   ├── api.ts               # API client
-│   └── crypto.ts            # Client-side crypto
-└── types/
-    └── index.ts             # Shared types
+30 tests passing:
+- crypto_test.rs: 96 lines (encryption/decryption)
+- keystore_test.rs: 113 lines (key storage)
+- session_test.rs: 100 lines (session management)
 ```
 
-#### 2.2 State Management
+### Areas for Improvement
 
-```typescript
-// hooks/useSettings.ts
-export function useSettings() {
-  const [config, setConfig] = useState<ServerConfig | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetch = async () => { ... };
-  const save = async (config: ServerConfig) => { ... };
-
-  return { config, loading, error, fetch, save };
-}
-```
-
-#### 2.3 API Client Layer
-
-```typescript
-// lib/api.ts
-class OmniAPI {
-  private baseUrl: string;
-
-  constructor(baseUrl = '/api/v1') {
-    this.baseUrl = baseUrl;
-  }
-
-  async getServerInfo(): Promise<ServerInfo> { ... }
-  async getSettings(): Promise<ServerConfig> { ... }
-  async updateSettings(config: ServerConfig): Promise<void> { ... }
-  async registerInit(clientId: string): Promise<RegisterInitResponse> { ... }
-  // ... etc
-}
-
-export const api = new OmniAPI();
-```
+1. **Integration Tests** - No end-to-end API tests
+2. **Error Types** - Could use a unified error enum
+3. **Logging** - Minimal structured logging
+4. **Metrics** - No Prometheus/observability
 
 ---
 
-## 3. Automated Feature Building
+## Frontend Analysis
 
-### Current CI/CD
+### Architecture (Next.js + React + TypeScript)
 
-```yaml
-# .github/workflows/backend.yml
-- Check formatting
-- Clippy
-- Build
-- Test
-- Upload artifact
-```
+**Strengths:**
+- Recently refactored from 817-line monolith to modular structure
+- All files under 280 lines
+- Custom hooks for data fetching with loading/error states
+- Centralized API client with type safety
+- Shared TypeScript types
 
-### Recommendations
+**Component Structure:**
 
-#### 3.1 Add Integration Tests Workflow
+| Component | Lines | Purpose |
+|-----------|-------|---------|
+| `page.tsx` | 135 | Main layout and routing |
+| `SettingsTab.tsx` | 279 | Server configuration UI |
+| `RegisterTab.tsx` | 162 | Client registration flow |
+| `HomeTab.tsx` | 105 | Server info and admin login |
+| `ServerTab.tsx` | 87 | Federation servers list |
+| `KeysTab.tsx` | 77 | Client keypair display |
+| `TabButton.tsx` | 29 | Reusable tab navigation |
 
-```yaml
-# .github/workflows/integration.yml
-name: Integration Tests
+**Custom Hooks:**
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+| Hook | Lines | Purpose |
+|------|-------|---------|
+| `useSettings` | 47 | Config fetch/save with loading states |
+| `useClientKeys` | 37 | LocalStorage key management |
+| `useAuth` | 32 | Admin login state |
+| `useServerInfo` | 30 | Server public key fetch |
+| `useKnownServers` | 30 | Federation servers fetch |
 
-jobs:
-  integration:
-    runs-on: ubuntu-latest
-    services:
-      server1:
-        image: ghcr.io/${{ github.repository }}/omni-server:latest
-        ports:
-          - 8081:8080
-      server2:
-        image: ghcr.io/${{ github.repository }}/omni-server:latest
-        ports:
-          - 8082:8080
+**API Client (`lib/api.ts`):**
+- 94 lines
+- Type-safe methods for all backend endpoints
+- Centralized error handling
+- Configurable base URL
 
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Wait for servers
-        run: |
-          for i in {1..30}; do
-            curl -s http://localhost:8081/api/v1/health && break
-            sleep 1
-          done
+### Areas for Improvement
 
-      - name: Run integration tests
-        run: ./scripts/integration-test.sh
-```
-
-#### 3.2 Add Docker Image Publishing
-
-```yaml
-# .github/workflows/docker.yml
-name: Docker Build
-
-on:
-  push:
-    tags: ['v*']
-    branches: [main]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push backend
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: backend/Dockerfile
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}/omni-server:latest
-            ghcr.io/${{ github.repository }}/omni-server:${{ github.sha }}
-```
-
-#### 3.3 Add Release Automation
-
-```yaml
-# .github/workflows/release.yml
-name: Release
-
-on:
-  push:
-    tags: ['v*']
-
-jobs:
-  release:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Build binaries
-        run: |
-          cargo build --release --target x86_64-unknown-linux-gnu
-          cargo build --release --target x86_64-apple-darwin
-          cargo build --release --target aarch64-apple-darwin
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            target/x86_64-unknown-linux-gnu/release/omni-server
-            target/x86_64-apple-darwin/release/omni-server
-            target/aarch64-apple-darwin/release/omni-server
-```
-
-#### 3.4 Add Dependabot
-
-```yaml
-# .github/dependabot.yml
-version: 2
-updates:
-  - package-ecosystem: "cargo"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    groups:
-      rust-dependencies:
-        patterns:
-          - "*"
-
-  - package-ecosystem: "npm"
-    directory: "/frontend"
-    schedule:
-      interval: "weekly"
-
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-```
+1. **Unit Tests** - No Vitest/Jest tests yet
+2. **Error Boundaries** - No React error boundaries
+3. **Loading States** - Could use skeleton loaders
+4. **Accessibility** - No ARIA labels or keyboard navigation
 
 ---
 
-## 4. Feature Flag System
+## CI/CD & DevOps
 
-### Recommendation: Add Feature Flags
+### GitHub Workflows
 
-```rust
-// crates/omni-core/src/features.rs
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FeatureFlags {
-    pub federation_enabled: bool,
-    pub public_registration: bool,
-    pub admin_ui_enabled: bool,
-    pub sync_enabled: bool,
-    pub experimental_features: bool,
-}
+| Workflow | Purpose | Status |
+|----------|---------|--------|
+| `backend.yml` | Rust fmt, clippy, tests | ✅ Active |
+| `frontend.yml` | TypeScript build | ✅ Active |
+| `docker.yml` | Multi-arch Docker builds | ✅ New |
+| `release.yml` | Automated releases on tags | ✅ New |
 
-impl Default for FeatureFlags {
-    fn default() -> Self {
-        Self {
-            federation_enabled: true,
-            public_registration: true,
-            admin_ui_enabled: true,
-            sync_enabled: true,
-            experimental_features: false,
-        }
-    }
-}
-```
+### Dependabot
 
-**Usage in API:**
-```rust
-pub async fn register_server(
-    State(state): State<AppState>,
-    Json(req): Json<RegisterServerRequest>,
-) -> Result<Json<Response>, StatusCode> {
-    if !state.features.federation_enabled {
-        return Err(StatusCode::SERVICE_UNAVAILABLE);
-    }
-    // ...
-}
-```
+- Configured for Cargo, npm, and GitHub Actions
+- Weekly update schedule
+
+### Docker
+
+- `docker-compose.yml` - Production setup
+- `docker-compose.test.yml` - Integration testing
+- Multi-arch builds (amd64, arm64)
 
 ---
 
-## 5. Plugin/Extension System
+## Documentation
 
-### Recommendation: Add Plugin Architecture
-
-```rust
-// crates/omni-core/src/plugin.rs
-#[async_trait]
-pub trait Plugin: Send + Sync {
-    fn name(&self) -> &str;
-    fn version(&self) -> &str;
-    
-    async fn on_startup(&self, state: &AppState) -> Result<()>;
-    async fn on_shutdown(&self, state: &AppState) -> Result<()>;
-    
-    fn routes(&self) -> Option<Router<AppState>> { None }
-    fn middleware(&self) -> Option<BoxLayer> { None }
-}
-
-// Example plugin
-pub struct MetricsPlugin;
-
-#[async_trait]
-impl Plugin for MetricsPlugin {
-    fn name(&self) -> &str { "metrics" }
-    fn version(&self) -> &str { "0.1.0" }
-    
-    fn routes(&self) -> Option<Router<AppState>> {
-        Some(Router::new()
-            .route("/metrics", get(prometheus_metrics)))
-    }
-}
-```
+| Document | Lines | Status |
+|----------|-------|--------|
+| `ARCHITECTURE.md` | 513 | ✅ Complete |
+| `CONTRIBUTING.md` | 439 | ✅ Complete |
+| `RELEASE_SCHEDULE.md` | 405 | ✅ Complete |
+| `Integration-Guide.md` | 527 | ✅ Complete |
+| `API-Reference.md` | 365 | ✅ Complete |
+| `README.md` | 107 | ✅ Complete |
 
 ---
 
-## 6. OpenAPI/Swagger Generation
+## Compliance with Architecture Standards
 
-### Recommendation: Add Auto-Generated API Docs
+### File Size Limits (Max 500 lines)
 
-```toml
-# backend/Cargo.toml
-[dependencies]
-utoipa = { version = "4", features = ["axum_extras"] }
-utoipa-swagger-ui = { version = "6", features = ["axum"] }
-```
+| Category | Largest File | Lines | Status |
+|----------|--------------|-------|--------|
+| Backend Services | `server_registry.rs` | 313 | ✅ |
+| Backend API | `register.rs` | 193 | ✅ |
+| Frontend Components | `SettingsTab.tsx` | 279 | ✅ |
+| Frontend Hooks | `useSettings.ts` | 47 | ✅ |
 
-```rust
-// backend/src/api/mod.rs
-use utoipa::OpenApi;
+### Modularity Checklist
 
-#[derive(OpenApi)]
-#[openapi(
-    paths(
-        health::health_check,
-        admin::get_server_info,
-        settings::get_settings,
-        // ... all endpoints
-    ),
-    components(schemas(
-        ServerInfo,
-        ServerConfig,
-        // ... all types
-    ))
-)]
-pub struct ApiDoc;
-
-pub fn routes() -> Router<AppState> {
-    Router::new()
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        // ... existing routes
-}
-```
+- [x] Single responsibility per module
+- [x] Clear separation of API and services
+- [x] Reusable hooks for data fetching
+- [x] Centralized type definitions
+- [x] No circular dependencies
 
 ---
 
-## 7. Observability
+## Recommendations
 
-### Recommendation: Add Metrics & Tracing
+### High Priority
 
-```rust
-// backend/src/observability.rs
-use metrics::{counter, histogram};
-use tracing::instrument;
+1. **Add Integration Tests**
+   - Use `docker-compose.test.yml` for E2E tests
+   - Test registration flow, federation sync
+   - Add to CI pipeline
 
-#[instrument(skip(state))]
-pub async fn register_init(
-    State(state): State<AppState>,
-    Json(req): Json<RegisterInitRequest>,
-) -> Result<Json<Response>, StatusCode> {
-    counter!("omni_registrations_initiated").increment(1);
-    
-    let start = std::time::Instant::now();
-    let result = do_registration(&state, &req).await;
-    histogram!("omni_registration_duration_ms").record(start.elapsed().as_millis() as f64);
-    
-    result
-}
-```
+2. **Add Frontend Unit Tests**
+   - Set up Vitest
+   - Test custom hooks
+   - Test API client methods
 
-```yaml
-# docker-compose.yml addition
-services:
-  prometheus:
-    image: prom/prometheus
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    ports:
-      - "9090:9090"
+3. **Implement Error Boundaries**
+   - Wrap tab components
+   - Add fallback UI
 
-  grafana:
-    image: grafana/grafana
-    ports:
-      - "3001:3000"
-```
+### Medium Priority
 
----
+4. **Add Prometheus Metrics**
+   - Request counts, latencies
+   - Active sessions, registered clients
+   - Federation sync status
 
-## 8. Database Migration Path
+5. **Improve Logging**
+   - Structured JSON logs
+   - Request tracing with correlation IDs
+   - Log levels per module
 
-### Current: YAML Files
-### Future: SQLite → PostgreSQL
+6. **Add OpenAPI Documentation**
+   - Use `utoipa` crate
+   - Auto-generate from code
+   - Swagger UI endpoint
 
-```rust
-// crates/omni-storage/src/migrations.rs
-pub async fn run_migrations(pool: &PgPool) -> Result<()> {
-    sqlx::migrate!("./migrations").run(pool).await?;
-    Ok(())
-}
-```
+### Low Priority
 
-```sql
--- migrations/001_initial.sql
-CREATE TABLE clients (
-    id TEXT PRIMARY KEY,
-    public_key TEXT NOT NULL,
-    server_secret_key TEXT NOT NULL,
-    registered_at TIMESTAMPTZ NOT NULL,
-    last_seen TIMESTAMPTZ
-);
+7. **Add Loading Skeletons**
+   - Replace "Loading..." text
+   - Improve perceived performance
 
-CREATE TABLE servers (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    public_url TEXT NOT NULL,
-    public_key TEXT NOT NULL,
-    is_public BOOLEAN DEFAULT true,
-    is_authenticated BOOLEAN DEFAULT false,
-    discovered_at TIMESTAMPTZ NOT NULL
-);
-```
+8. **Accessibility Audit**
+   - Add ARIA labels
+   - Keyboard navigation
+   - Screen reader testing
 
 ---
 
-## Implementation Priority
+## Release Readiness
 
-| Priority | Item | Effort | Impact |
-|----------|------|--------|--------|
-| 🔴 High | Frontend component extraction | Medium | High |
-| 🔴 High | API client layer | Low | High |
-| 🟡 Medium | Crate extraction | High | High |
-| 🟡 Medium | Docker publishing workflow | Low | Medium |
-| 🟡 Medium | Integration tests | Medium | High |
-| 🟢 Low | OpenAPI generation | Low | Medium |
-| 🟢 Low | Plugin system | High | Medium |
-| 🟢 Low | Database migration | High | Low (for now) |
+### v0.1.0 (Current)
 
----
+| Requirement | Status |
+|-------------|--------|
+| Core backend functionality | ✅ Complete |
+| Frontend UI | ✅ Complete |
+| Settings configuration | ✅ Complete |
+| Federation sync | ✅ Complete |
+| Docker deployment | ✅ Complete |
+| CI/CD pipelines | ✅ Complete |
+| Documentation | ✅ Complete |
+| Unit tests | ⚠️ Backend only |
+| Integration tests | ❌ Not started |
 
-## Quick Wins (Can Do Now)
+### Blockers for v0.2.0
 
-1. **Add Dependabot** - 5 minutes
-2. **Add Docker publish workflow** - 15 minutes
-3. **Extract API client in frontend** - 30 minutes
-4. **Add `/metrics` endpoint** - 30 minutes
-5. **Add OpenAPI docs** - 1 hour
+1. Frontend unit tests (Phase 2 requirement)
+2. Integration test suite
 
 ---
 
 ## Conclusion
 
-Omni Core has a solid foundation. The main improvements needed are:
+Omni Core is in good shape for a pre-release project. The recent frontend refactoring significantly improved code quality and maintainability. All files comply with the 500-line limit, and the architecture follows best practices for separation of concerns.
 
-1. **Frontend refactoring** - Break up the monolithic component
-2. **Crate extraction** - Enable reuse of core functionality
-3. **CI/CD enhancement** - Add integration tests, Docker publishing, releases
-4. **Observability** - Add metrics and better tracing
+**Next Steps:**
+1. Complete Phase 2 (Frontend testing)
+2. Set up integration tests
+3. Tag v0.1.0 release
+4. Create GitHub project board with issues from `scripts/create-github-issues.js`
 
-These changes will make the project more maintainable, testable, and ready for production use.
+---
+
+*Generated by project review on December 14, 2025*
