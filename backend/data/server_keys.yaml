@@ -9,3 +9,8 @@ keys:
     public_key: f1780c3aa1b5e3bc6d042060f9c751934438630d1758ab16f4cc3480b0725633
     secret_key: 1ba37ff5e9d7b97a414e709faf0b61bd9729a0e7f7921253174d0f4ec7df67a8
     created_at: 2025-12-14T23:38:32.073996+00:00
+  test-device:
+    client_id: test-device
+    public_key: 9453a92225058e1828f4715c9467c761f15dff0ec675812f789e809fd7109213
+    secret_key: bdbc7071c39db7cb3696457cd413df013265f6918ccb8dbd010fd5a6d1ccd30b
+    created_at: 2025-12-14T23:38:47.279191+00:00
