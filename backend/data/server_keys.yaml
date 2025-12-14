@@ -1,0 +1,11 @@
+keys:
+  device-1:
+    client_id: device-1
+    public_key: 004dc9e43eb9a67f4c7a59e270391ba063cb3c1ad61d47c8838b09115cefd106
+    secret_key: 0b0185b443849b9be0f37da65370a6b7fca18bda1a1c2d92b958e35f471baeb8
+    created_at: 2025-12-14T22:48:34.398339+00:00
+  device-2:
+    client_id: device-2
+    public_key: c2b4ed3da3209b3f616f4aace605b086acbe6d9f48d57ef330698b97c17d306e
+    secret_key: b9611f1cb48c8c3ac6b001bbca1a4d59d783f25bf1c65d93997577a11be61f6f
+    created_at: 2025-12-14T22:48:34.398628+00:00

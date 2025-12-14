@@ -4,6 +4,13 @@ mod crypto;
 mod keystore;
 mod session;
 
+#[cfg(test)]
+mod crypto_test;
+#[cfg(test)]
+mod keystore_test;
+#[cfg(test)]
+mod session_test;
+
 use crate::config::Config;
 use std::sync::Arc;
 
