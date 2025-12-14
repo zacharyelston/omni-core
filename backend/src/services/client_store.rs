@@ -75,8 +75,7 @@ impl ClientConfig {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        let yaml = serde_yaml::to_string(self)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let yaml = serde_yaml::to_string(self).map_err(std::io::Error::other)?;
         fs::write(path, yaml)
     }
 
@@ -143,7 +142,7 @@ impl ClientStore {
             let mut clients = self.clients.write().unwrap();
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().map_or(false, |e| e == "yaml") {
+                if path.extension().is_some_and(|e| e == "yaml") {
                     if let Ok(content) = fs::read_to_string(&path) {
                         if let Ok(client) = serde_yaml::from_str::<ClientConfig>(&content) {
                             clients.insert(client.client_id.clone(), client);

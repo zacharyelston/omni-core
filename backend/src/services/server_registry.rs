@@ -69,8 +69,7 @@ impl ServerEntry {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        let yaml = serde_yaml::to_string(self)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let yaml = serde_yaml::to_string(self).map_err(std::io::Error::other)?;
         fs::write(path, yaml)
     }
 
@@ -123,7 +122,7 @@ impl ServerRegistry {
             let mut servers = self.servers.write().unwrap();
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().map_or(false, |e| e == "yaml") {
+                if path.extension().is_some_and(|e| e == "yaml") {
                     if let Ok(content) = fs::read_to_string(&path) {
                         if let Ok(server) = serde_yaml::from_str::<ServerEntry>(&content) {
                             servers.insert(server.server_id.clone(), server);
@@ -222,11 +221,9 @@ impl ServerRegistry {
         let mut current = self.servers.write().unwrap();
 
         for server in servers {
-            if !current.contains_key(&server.server_id) {
-                if server.save().is_ok() {
-                    current.insert(server.server_id.clone(), server);
-                    added += 1;
-                }
+            if !current.contains_key(&server.server_id) && server.save().is_ok() {
+                current.insert(server.server_id.clone(), server);
+                added += 1;
             }
         }
 

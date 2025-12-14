@@ -94,8 +94,7 @@ impl ServerKeysStore {
         if let Some(parent) = Path::new(path).parent() {
             fs::create_dir_all(parent)?;
         }
-        let yaml = serde_yaml::to_string(self)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let yaml = serde_yaml::to_string(self).map_err(std::io::Error::other)?;
         fs::write(path, yaml)
     }
 
@@ -136,8 +135,7 @@ impl ClientConfigStore {
         if let Some(parent) = Path::new(path).parent() {
             fs::create_dir_all(parent)?;
         }
-        let yaml = serde_yaml::to_string(self)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let yaml = serde_yaml::to_string(self).map_err(std::io::Error::other)?;
         fs::write(path, yaml)
     }
 
