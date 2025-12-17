@@ -4,6 +4,7 @@ mod admin;
 mod auth;
 mod health;
 mod keys;
+pub mod metrics;
 mod register;
 mod servers;
 mod settings;

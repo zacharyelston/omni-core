@@ -52,5 +52,9 @@ serde_yaml = { workspace = true }
 # HTTP client
 reqwest = { workspace = true }
 
+# Metrics
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+
 [dev-dependencies]
 tempfile = "3.10"

@@ -4,6 +4,7 @@ mod admin;
 mod client_store;
 mod crypto;
 mod keystore;
+pub mod metrics;
 mod server_config;
 mod server_registry;
 mod session;
