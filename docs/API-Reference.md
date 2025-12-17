@@ -210,3 +210,156 @@ List all server public keys (one per client).
   ]
 }
 ```
+
+---
+
+## Server Info & Admin
+
+### GET /server/info
+Get public server information (no auth required).
+
+**Response:**
+```json
+{
+  "server_public_key": "abc123def456...",
+  "server_name": "Omni Core Server",
+  "version": "0.1.0"
+}
+```
+
+### POST /admin/login
+Authenticate as admin.
+
+**Request:**
+```json
+{
+  "admin_key": "admin_abc123..."
+}
+```
+
+**Response:**
+```json
+{
+  "authenticated": true,
+  "message": "Admin session created. API key: omni_..."
+}
+```
+
+### GET /admin/dashboard
+Get admin dashboard data.
+
+**Response:**
+```json
+{
+  "total_clients": 5,
+  "total_server_keys": 5,
+  "server_public_key": "abc123def456..."
+}
+```
+
+---
+
+## Server Federation
+
+Servers can register with each other and share their known server lists, creating a DNS-like discovery mechanism.
+
+### GET /servers/public
+List all public servers (no auth required).
+
+**Response:**
+```json
+{
+  "servers": [
+    {
+      "server_id": "srv_abc123...",
+      "name": "Remote Server",
+      "description": "A remote Omni Core server",
+      "public_url": "https://remote.example.com",
+      "public_key": "def456...",
+      "version": "0.1.0"
+    }
+  ],
+  "total": 1
+}
+```
+
+### POST /servers/register
+Register a new server.
+
+**Request:**
+```json
+{
+  "server_id": "srv_abc123...",
+  "name": "My Server",
+  "description": "My Omni Core server",
+  "public_url": "https://my.example.com",
+  "public_key": "abc123...",
+  "is_public": true
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Server registered successfully",
+  "our_server_id": "srv_def456...",
+  "our_public_key": "def456..."
+}
+```
+
+### POST /servers/sync
+Sync server lists with an authenticated server.
+
+**Request:**
+```json
+{
+  "requesting_server_id": "srv_abc123...",
+  "requesting_server_key": "abc123..."
+}
+```
+
+**Response:**
+```json
+{
+  "servers": [...],
+  "total": 5
+}
+```
+
+**Errors:**
+- `401 Unauthorized` - Server not authenticated
+
+### GET /servers/stats
+Get server statistics.
+
+**Response:**
+```json
+{
+  "total_servers": 10,
+  "public_servers": 8,
+  "authenticated_servers": 3
+}
+```
+
+### GET /servers/all
+List all known servers (admin only).
+
+**Response:**
+```json
+[
+  {
+    "server_id": "srv_abc123...",
+    "name": "Remote Server",
+    "public_url": "https://remote.example.com",
+    "public_key": "def456...",
+    "is_public": true,
+    "is_authenticated": false,
+    "discovered_at": "2024-12-14T22:00:00Z",
+    "last_seen": null,
+    "last_sync": null,
+    "version": "0.1.0",
+    "trust_level": 50
+  }
+]
+```

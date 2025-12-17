@@ -1,0 +1,52 @@
+#!/bin/bash
+# Pre-commit hook for omni-core
+# Runs formatting, linting, and tests before allowing commit
+
+set -e
+
+echo "🔍 Pre-commit checks..."
+
+# Get the root directory
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+
+# Check if any Rust files are staged
+RUST_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.rs$' || true)
+
+if [ -n "$RUST_STAGED" ]; then
+    echo "📦 Checking Rust code..."
+    
+    # Format check
+    echo "  → cargo fmt"
+    cargo fmt --all -- --check
+    
+    # Clippy
+    echo "  → cargo clippy"
+    cargo clippy --all-targets --all-features -- -D warnings -A warnings
+    
+    # Tests
+    echo "  → cargo test"
+    cargo test --all --quiet
+    
+    echo "✅ Rust checks passed"
+fi
+
+# Check if any frontend files are staged
+FRONTEND_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^frontend/.*\.(ts|tsx|js|jsx)$' || true)
+
+if [ -n "$FRONTEND_STAGED" ]; then
+    echo "🌐 Checking Frontend code..."
+    
+    if [ -d "$ROOT_DIR/frontend/node_modules" ]; then
+        cd "$ROOT_DIR/frontend"
+        
+        # TypeScript check
+        echo "  → tsc --noEmit"
+        npx tsc --noEmit
+        
+        echo "✅ Frontend checks passed"
+    else
+        echo "⚠️  Skipping frontend checks (run 'npm install' in frontend/)"
+    fi
+fi
+
+echo "🎉 Pre-commit checks complete!"

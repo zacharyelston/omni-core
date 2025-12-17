@@ -1,0 +1,48 @@
+[package]
+name = "omni-core-lib"
+description = "Reusable library for omni-core authentication, crypto, and federation services"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "omni_core"
+path = "src/lib.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+
+# UUID
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Crypto
+argon2 = "0.5"
+base64 = "0.22"
+rand = "0.8"
+x25519-dalek = { version = "2.0", features = ["static_secrets"] }
+chacha20poly1305 = "0.10"
+ed25519-dalek = { version = "2.0", features = ["rand_core"] }
+hex = "0.4"
+
+# HTTP client (for sync service)
+reqwest = { version = "0.11", features = ["json"] }
+
+[dev-dependencies]
+tempfile = "3.10"
+tokio-test = "0.4"

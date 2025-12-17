@@ -4,10 +4,16 @@ mod admin;
 mod auth;
 mod health;
 mod keys;
+pub mod metrics;
 mod register;
+mod servers;
+mod settings;
 
-use axum::{routing::{get, post}, Router};
 use crate::services::AppState;
+use axum::{
+    routing::{get, post, put},
+    Router,
+};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -31,4 +37,27 @@ pub fn routes() -> Router<AppState> {
         .route("/register/complete", post(register::register_complete))
         .route("/register/clients", get(register::list_clients))
         .route("/register/keys", get(register::list_server_keys))
+        // Server federation
+        .route("/servers/public", get(servers::list_public_servers))
+        .route("/servers/register", post(servers::register_server))
+        .route("/servers/sync", post(servers::sync_servers))
+        .route("/servers/stats", get(servers::server_stats))
+        .route("/servers/all", get(servers::list_all_servers))
+        // Settings
+        .route("/settings", get(settings::get_settings))
+        .route("/settings", put(settings::update_all_settings))
+        .route("/settings/server", get(settings::get_server_settings))
+        .route("/settings/server", put(settings::update_server_settings))
+        .route("/settings/network", get(settings::get_network_settings))
+        .route("/settings/network", put(settings::update_network_settings))
+        .route("/settings/auth", get(settings::get_auth_settings))
+        .route("/settings/auth", put(settings::update_auth_settings))
+        .route(
+            "/settings/federation",
+            get(settings::get_federation_settings),
+        )
+        .route(
+            "/settings/federation",
+            put(settings::update_federation_settings),
+        )
 }

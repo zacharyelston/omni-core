@@ -1,11 +1,16 @@
 keys:
   device-1:
     client_id: device-1
-    public_key: 004dc9e43eb9a67f4c7a59e270391ba063cb3c1ad61d47c8838b09115cefd106
-    secret_key: 0b0185b443849b9be0f37da65370a6b7fca18bda1a1c2d92b958e35f471baeb8
-    created_at: 2025-12-14T22:48:34.398339+00:00
+    public_key: dc14b7c6520693bec5ebe56b41b7227591b70cda7b6e2ce067929519cc178a7b
+    secret_key: d742ce2316739bb3a86205195ba7152d8a71905bdd1ce4d2cc554a28e0df3e9d
+    created_at: 2025-12-17T23:58:31.948433+00:00
   device-2:
     client_id: device-2
-    public_key: c2b4ed3da3209b3f616f4aace605b086acbe6d9f48d57ef330698b97c17d306e
-    secret_key: b9611f1cb48c8c3ac6b001bbca1a4d59d783f25bf1c65d93997577a11be61f6f
-    created_at: 2025-12-14T22:48:34.398628+00:00
+    public_key: 48e41aabe3deba158605b27c1b05add0712b877abae75ec91ef236894fbfa74b
+    secret_key: be068cb0d9d07df91cf0601a78bd3401c0772b9bc7d11260b54c453861092065
+    created_at: 2025-12-17T23:58:31.948718+00:00
+  test-device:
+    client_id: test-device
+    public_key: 9453a92225058e1828f4715c9467c761f15dff0ec675812f789e809fd7109213
+    secret_key: bdbc7071c39db7cb3696457cd413df013265f6918ccb8dbd010fd5a6d1ccd30b
+    created_at: 2025-12-14T23:38:47.279191+00:00

@@ -74,8 +74,8 @@ pub struct EncryptedMessage {
 impl EncryptedMessage {
     /// Encrypt plaintext using shared secret
     pub fn encrypt(plaintext: &[u8], shared_secret: &[u8; 32]) -> Result<Self, CryptoError> {
-        let cipher = ChaCha20Poly1305::new_from_slice(shared_secret)
-            .map_err(|_| CryptoError::InvalidKey)?;
+        let cipher =
+            ChaCha20Poly1305::new_from_slice(shared_secret).map_err(|_| CryptoError::InvalidKey)?;
 
         let mut nonce_bytes = [0u8; 12];
         rand::thread_rng().fill_bytes(&mut nonce_bytes);
@@ -106,8 +106,8 @@ impl EncryptedMessage {
             .decode(&self.ciphertext)
             .map_err(|_| CryptoError::InvalidCiphertext)?;
 
-        let cipher = ChaCha20Poly1305::new_from_slice(shared_secret)
-            .map_err(|_| CryptoError::InvalidKey)?;
+        let cipher =
+            ChaCha20Poly1305::new_from_slice(shared_secret).map_err(|_| CryptoError::InvalidKey)?;
 
         let nonce = Nonce::from_slice(&nonce_bytes);
 
@@ -136,9 +136,7 @@ pub enum CryptoError {
 /// Parse hex-encoded public key
 pub fn parse_public_key(hex_key: &str) -> Result<[u8; 32], CryptoError> {
     let bytes = hex::decode(hex_key).map_err(|_| CryptoError::InvalidPublicKey)?;
-    bytes
-        .try_into()
-        .map_err(|_| CryptoError::InvalidPublicKey)
+    bytes.try_into().map_err(|_| CryptoError::InvalidPublicKey)
 }
 
 #[cfg(test)]

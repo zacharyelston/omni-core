@@ -1,12 +1,8 @@
 //! Key exchange endpoints
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    Json,
-};
-use serde::{Deserialize, Serialize};
 use crate::services::{parse_public_key, AppState, EncryptedMessage};
+use axum::{extract::State, http::StatusCode, Json};
+use serde::{Deserialize, Serialize};
 
 /// Response with server's public key
 #[derive(Serialize)]
@@ -46,9 +42,7 @@ pub struct EncryptedResponse {
 }
 
 /// Get server's public key for key exchange
-pub async fn get_public_key(
-    State(state): State<AppState>,
-) -> Json<PublicKeyResponse> {
+pub async fn get_public_key(State(state): State<AppState>) -> Json<PublicKeyResponse> {
     Json(PublicKeyResponse {
         public_key: state.server_keypair.public_key_hex(),
     })
@@ -90,7 +84,9 @@ pub async fn send_encrypted(
     let shared_secret = state.server_keypair.derive_shared_secret(&client_public);
 
     // Decrypt the incoming message
-    let plaintext = req.payload.decrypt(&shared_secret)
+    let plaintext = req
+        .payload
+        .decrypt(&shared_secret)
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
 
     // Process the message (echo back for now)

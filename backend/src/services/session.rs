@@ -43,7 +43,10 @@ fn generate_api_key() -> String {
 
     let mut bytes = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut bytes);
-    format!("omni_{}", base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes))
+    format!(
+        "omni_{}",
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+    )
 }
 
 #[derive(Clone, Default)]

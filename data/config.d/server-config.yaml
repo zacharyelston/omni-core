@@ -1,0 +1,36 @@
+# Omni Core Server Configuration
+# This file is auto-generated on first run
+
+server:
+  # Unique server identifier (generated on first run)
+  id: ""
+  # Human-readable server name
+  name: "Omni Core Server"
+  # Server description
+  description: "An Omni Core authentication server"
+  # Server version
+  version: "0.1.0"
+  
+network:
+  # Host to bind to
+  host: "0.0.0.0"
+  # Port to listen on
+  port: 8080
+  # Public URL for this server (used for server-to-server communication)
+  public_url: ""
+
+auth:
+  # Session TTL in seconds (default: 1 hour)
+  session_ttl_secs: 3600
+  # Admin session TTL multiplier
+  admin_session_multiplier: 24
+
+federation:
+  # Whether this server participates in server federation
+  enabled: true
+  # Whether to list this server publicly to other servers
+  public: true
+  # How often to sync server lists (in seconds)
+  sync_interval_secs: 3600
+  # Maximum servers to track
+  max_known_servers: 1000

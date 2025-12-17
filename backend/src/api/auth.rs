@@ -1,12 +1,8 @@
 //! Authentication endpoints
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    Json,
-};
-use serde::{Deserialize, Serialize};
 use crate::services::AppState;
+use axum::{extract::State, http::StatusCode, Json};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 pub struct JoinResponse {
@@ -33,11 +29,9 @@ pub struct LogoutResponse {
 }
 
 /// Create a new session and return API key
-pub async fn join(
-    State(state): State<AppState>,
-) -> Json<JoinResponse> {
+pub async fn join(State(state): State<AppState>) -> Json<JoinResponse> {
     let session = state.sessions.create(state.config.session_ttl_secs);
-    
+
     Json(JoinResponse {
         session_id: session.id.to_string(),
         api_key: session.api_key,
